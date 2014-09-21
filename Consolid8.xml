@@ -19,7 +19,7 @@
 -->
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
-	<Button name="Consolid8_Frame" parent="ChatFrame1" enableMouse="true">
+	<Button name="Consolid8_Frame" parent="UIParent" enableMouse="true" movable="true">
 		<Size x="32" y="32" />
 		<Anchors>
 			<Anchor point="BOTTOM" relativeTo="ChatFrameMenuButton" relativePoint="TOP" />
@@ -42,6 +42,23 @@
 			<OnLeave>
 				Consolid8.HideTooltip()
 			</OnLeave>
+			
+			<!-- Movable/Sizable frame scripts -->
+			<OnMouseDown>
+				if IsShiftKeyDown() then
+					self:StartMoving()
+				end
+			</OnMouseDown>
+			<OnMouseWheel>
+				if IsShiftKeyDown() then
+					local scale = self:GetScale() + (arg1 * 0.05)
+					self:SetScale(scale)
+					Consolid8_Scale = scale
+				end
+			</OnMouseWheel>
+			<OnMouseUp>
+				self:StopMovingOrSizing()
+			</OnMouseUp>
 		</Scripts>
 		
 		<NormalTexture file="Interface\AddOns\Consolid8\Button-Up"/>

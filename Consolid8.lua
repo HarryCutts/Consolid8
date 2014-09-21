@@ -18,13 +18,15 @@
     along with Consolid8.  If not, see <http://www.gnu.org/licenses/>.
 ]]--
 
-local L = Consolid8_Locale	-- Local locale table
+local addOnName, L = ...	-- Local locale table
 
-local data = {
-	-- ["MONEY"] : tracks the amount of money looted.
+local data = {}
+local specialData = {
+	-- Money : money looted
 }
 Consolid8 = {
-	data = data 
+	data = data,
+	specialData = specialData,
 }
 
 --[[ Local Functions ]]--
@@ -32,7 +34,7 @@ Consolid8 = {
 local function print(message)
 	-- Writes a message to the chat frame, prefixed by "Consolid8: " in color.
 	-- message: The string to print in the chat frame
-	DEFAULT_CHAT_FRAME:AddMessage("|cFF0080FF" .. L["NAME"] .. ":|r " .. message)
+	DEFAULT_CHAT_FRAME:AddMessage("|cFF0080FF" .. addOnName .. ":|r " .. message)
 end
 
 local function CoppersToString(copper)
@@ -62,12 +64,22 @@ local function ChangeData(faction, change)
 	data[faction] = (data[faction] or 0) + change
 end
 
+local function ChangeSpecialData(key, change)
+	-- Changes the data in the data table to reflect the change of reputation.
+	--     key: The data to change.
+	--  change: The amount by which the data has changed. Negative values decrement the data.
+	specialData[key] = (specialData[key] or 0) + change
+end
+
 --[[ Public Functions ]]--
 
 function Consolid8.Report()
 	-- Dumps the contents of the data table to the default chat frame.
 	print(L["REPORT"] .. ":")
 	for key, value in pairs(data) do
+		print(format("%s = %d", key, value))
+	end
+	for key, value in pairs(specialData) do
 		print(format("%s = %d", key, value))
 	end
 end
@@ -77,53 +89,56 @@ function Consolid8.Reset()
 	for key, value in pairs(data) do
 		data[key] = nil
 	end
+	for key, value in pairs(specialData) do
+		specialData[key] = nil
+	end
 	print(RESET)
 end
 
 --[[ AddOn Methods ]]--
 
 local frame
+local originalHonor
 
 function Consolid8.OnLoad()
 	-- Initialize local and public variables
 	frame = Consolid8_Frame;
 	Consolid8.frame = frame;
 	
-	-- Set the scale to be the same as the other chat buttons
-	frame:SetScale(ChatFrameMenuButton:GetScale())
-	
 	-- Register events
-	frame:RegisterEvent("ADDON_LOADED")
+	frame:RegisterEvent("PLAYER_LOGIN")
 	frame:RegisterEvent("CHAT_MSG_COMBAT_FACTION_CHANGE")
 	frame:RegisterEvent("CHAT_MSG_MONEY")
 end
 
 function Consolid8.OnEvent(self, event, arg1, ...)
-	if event == "ADDON_LOADED" then
-		-- Set the scale to be the same as the other chat buttons
-		frame:SetScale(ChatFrameMenuButton:GetScale())
-	elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
+	if event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
 		-- arg1: the message to be printed to the chat frame.
 		-- Attempt to match the increased pattern string
 		local faction, change = arg1:match(L["REP_INC"])
 		
-		if faction --[[a match has been found]] then
+		if change --[[a match has been found]] then
 			ChangeData(faction, change)
 			
 		else
 			-- Attempt to match the decreased pattern string
 			faction, change = arg1:match(L["REP_DEC"])
 			
-			if faction --[[a match has been found]] then
+			if change --[[a match has been found]] then
 				ChangeData(faction, -change)
 			end
 		end
-	
-	elseif event == "CHAT_MSG_MONEY" then
-		-- arg1: the message to be printed to the chat frame.
-		local coppers = StringToCoppers(arg1)
-		ChangeData("MONEY", coppers)
 		
+	elseif event == "CHAT_MSG_MONEY" then
+		ChangeSpecialData("Money", StringToCoppers(arg1))
+	
+	elseif event == "PLAYER_LOGIN" then
+		-- arg1: the name of the addOn which has been loaded.
+		-- Set the scale to be the same as the other chat buttons
+		frame:SetScale(Consolid8_Scale or ChatFrameMenuButton:GetScale())
+		
+		-- Record the starting honor
+		originalHonor = GetHonorCurrency()
 	end -- if event
 end
 
@@ -141,13 +156,14 @@ end
 
 --[[ Broker plugin ]]--
 
-local dataObj = LibStub:GetLibrary("LibDataBroker-1.1"):NewDataObject("Consolid8",
+local watch 	= nil
+local dataObj 	= LibStub:GetLibrary("LibDataBroker-1.1"):NewDataObject("Consolid8",
 	{
-		type = "launcher",
-		icon = "Interface\\AddOns\\Consolid8\\Broker",
-		label = L["NAME"]
+		type 	= "data source",
+		icon 	= "Interface\\AddOns\\Consolid8\\Broker",
+		label 	= addOnName,
 	})
-
+	
 function dataObj.OnClick(self --[[, button]])
 	Consolid8.ShowMenu(self)
 end
@@ -175,22 +191,26 @@ function Consolid8.ShowTooltip()
 	tooltip:ClearLines()
 	
 	-- Header
-	tooltip:AddLine("Consolid8", 0, 0.5, 1)	-- Will be title line. Color the same as used in print method.
+	tooltip:AddLine(addOnName, 0, 0.5, 1)	-- Will be title line. Color the same as used in print method.
 	tooltip:AddLine(" ")
 	
 	-- Faction changes
 	tooltip:AddDoubleLine(FACTION, L["CHANGE"])	-- Column headers
 	
 	for key, value in pairs(data) do
-		if key ~= "MONEY" then
-			tooltip:AddDoubleLine(key, value, --[[Left]]0.5, 0.5, 1,	--[[Right]]0.5, 0.5, 1)
-		end
+		tooltip:AddDoubleLine(key, value, --[[Left]]0.5, 0.5, 1,	--[[Right]]0.5, 0.5, 1)
 	end
 	
+	tooltip:AddLine(" ")
 	-- Money
-	if data["MONEY"] then
-		tooltip:AddLine(" ")
-		tooltip:AddDoubleLine(MONEY, CoppersToString(data["MONEY"]))
+	if specialData.Money then
+		tooltip:AddDoubleLine(MONEY, CoppersToString(specialData.Money))
+	end
+	
+	-- Honor
+	local honorGain = GetHonorCurrency() - originalHonor
+	if honorGain ~= 0 then
+		tooltip:AddDoubleLine(HONOR, honorGain)
 	end
 	
     tooltip:Show()
@@ -203,23 +223,19 @@ end
 --[[ Menu ]]--
 
 local menuFrame
-local menuList = 
+local menuList =
 {
 	{	--[[ Consolid8 ]]--
-		text	= L["NAME"],
+		text	= addOnName,
 		isTitle = true
 	},
 	{	-- Reset
 		text 	= RESET,
-		func 	= function()
-			Consolid8.Reset()
-		end
+		func 	= Consolid8.Reset
 	},
 	{	-- Report
 		text	= L["REPORT"],
-		func	= function()
-			Consolid8.Report()
-		end
+		func	= Consolid8.Report
 	},
 }
 

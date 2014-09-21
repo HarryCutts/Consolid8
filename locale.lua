@@ -39,34 +39,35 @@ local function CreateFactionPattern(str)
 	return returnStr
 end
 
-local function CreateMoneyPattern(str)
-	-- Returns: a pattern string used to process money change messages.
-	-- 	   str: the format string from which to create the pattern string.
+local function CreateIntegerPattern(str)
+	-- Returns: a pattern string used to process honor and money messages.
+	--     str: the format string from which to create the pattern string.
 	return str:replace("%d", "(%d*)", 0, true)
 end
 
 -- Locale
 
-Consolid8_Locale =
-{
-	--[[ Non-localized strings ]]--
-	["NAME"]			= "Consolid8",
-	
-	--[[ Localised strings ]]--
-	["CHANGE"]			= "Change",
-	["REPORT"]			= "Report",
-	
-	--[[ Blizzard Localisation ]]--
-	-- Pattern strings
-	["REP_DEC"]  		= CreateFactionPattern	(FACTION_STANDING_DECREASED),
-	["REP_INC"]			= CreateFactionPattern	(FACTION_STANDING_INCREASED),
-	["MONEY_GOLD"]		= CreateMoneyPattern	(GOLD_AMOUNT),
-	["MONEY_SILVER"]	= CreateMoneyPattern	(SILVER_AMOUNT),
-	["MONEY_COPPER"]	= CreateMoneyPattern	(COPPER_AMOUNT),
-}
+local name, L = ...
 
-local L 	= Consolid8_Locale
-local loc 	= GetLocale()
+--[[ Localised strings ]]--
+L["CHANGE"]			= "Change"
+L["REPORT"]			= "Report"
+	
+--[[ Processed Blizzard Localisation ]]--
+-- Pattern strings
+L["REP_DEC"]  		= CreateFactionPattern	(FACTION_STANDING_DECREASED)
+L["REP_INC"]		= CreateFactionPattern	(FACTION_STANDING_INCREASED)
+
+L["MONEY_GOLD"]		= CreateIntegerPattern	(GOLD_AMOUNT)
+L["MONEY_SILVER"]	= CreateIntegerPattern	(SILVER_AMOUNT)
+L["MONEY_COPPER"]	= CreateIntegerPattern	(COPPER_AMOUNT)
+
+L["HONOR_1"]		= CreateIntegerPattern	(COMBATLOG_HONORGAIN)
+L["HONOR_2"]		= CreateIntegerPattern	(COMBATLOG_HONORAWARD)
+L["HONOR_3"]		= CreateIntegerPattern	(COMBATLOG_HONORGAIN_NO_RANK)
+
+
+local loc = GetLocale()
 
 if loc == "frFR" then
 	L["CHANGE"] = "Changement"
