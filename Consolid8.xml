@@ -19,29 +19,25 @@
 -->
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
+	<Font name="Consolid8TextStyle" inherits="GameFontNormal" virtual="true">
+		<Color r="1.0" g="1.0" b="1.0"/>
+	</Font>
+	<Font name="Consolid8NameStyle" inherits="Consolid8TextStyle" justifyH="LEFT" virtual="true"></Font>
+	<Font name="Consolid8ValueStyle" inherits="Consolid8TextStyle" justifyH="RIGHT" virtual="true"></Font>
+
 	<Button name="Consolid8_Frame" parent="UIParent" enableMouse="true" movable="true">
 		<Size x="32" y="32" />
 		<Anchors>
 			<Anchor point="BOTTOM" relativeTo="ChatFrameMenuButton" relativePoint="TOP" />
 		</Anchors>
 		<Scripts>
-			<OnLoad>
-				Consolid8.OnLoad()
-			</OnLoad>
-			<OnEvent>
-				Consolid8.OnEvent(self, event, ...)
-			</OnEvent>
+			<OnLoad> Consolid8.OnLoad()				</OnLoad>
+			<OnEvent>Consolid8.OnEvent(event, ...)	</OnEvent>
 			
 			<!-- Button Scripts -->
-			<OnEnter>
-				Consolid8.ShowTooltip()
-			</OnEnter>
-			<OnClick>
-				Consolid8.ShowMenu()
-			</OnClick>
-			<OnLeave>
-				Consolid8.HideTooltip()
-			</OnLeave>
+			<OnEnter>Consolid8.ShowTooltip()		</OnEnter>
+			<OnClick>Consolid8.ShowMenu()			</OnClick>
+			<OnLeave>Consolid8.HideTooltip()		</OnLeave>
 			
 			<!-- Movable/Sizable frame scripts -->
 			<OnMouseDown>
@@ -53,7 +49,7 @@
 				if IsShiftKeyDown() then
 					local scale = self:GetScale() + (arg1 * 0.05)
 					self:SetScale(scale)
-					Consolid8_Scale = scale
+					Consolid8_Settings.scale = scale
 				end
 			</OnMouseWheel>
 			<OnMouseUp>
@@ -63,7 +59,15 @@
 		
 		<NormalTexture file="Interface\AddOns\Consolid8\Button-Up"/>
 		<PushedTexture file="Interface\AddOns\Consolid8\Button-Down"/>
-		<DisabledTexture file="Interface\AddOns\Consolid8\Button-Disabled"/>
+		<!--<DisabledTexture file="Interface\AddOns\Consolid8\Button-Disabled"/>-->
 		<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
 	</Button>
+	
+	<Frame name="Consolid8_Menu" inherits="UIDropDownMenuTemplate" frameStrata="DIALOG_FULLSCREEN">
+		<Scripts>
+			<OnLoad>
+				UIDropDownMenu_Initialize(self, Consolid8.MenuFunction, "MENU")
+			</OnLoad>
+		</Scripts>
+	</Frame>
 </Ui>

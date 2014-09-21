@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Consolid8
 ## Notes: Gets rid of reputation change and money loot messages, and counts them up to make them meaningful.
-## SavedVariables: Consolid8_Scale
-## Version: 1.2
+## SavedVariables: Consolid8_Settings
+## Version: 1.3
 LibStub.lua
 CallbackHandler-1.0.lua
 LibDataBroker-1.1.lua
