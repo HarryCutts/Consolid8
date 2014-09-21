@@ -89,13 +89,20 @@ function Consolid8.OnLoad()
 	frame = Consolid8_Frame;
 	Consolid8.frame = frame;
 	
+	-- Set the scale to be the same as the other chat buttons
+	frame:SetScale(ChatFrameMenuButton:GetScale())
+	
 	-- Register events
+	frame:RegisterEvent("ADDON_LOADED")
 	frame:RegisterEvent("CHAT_MSG_COMBAT_FACTION_CHANGE")
-	frame:RegisterEvent("CHAT_MSG_MONEY");
+	frame:RegisterEvent("CHAT_MSG_MONEY")
 end
 
 function Consolid8.OnEvent(self, event, arg1, ...)
-	if event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
+	if event == "ADDON_LOADED" then
+		-- Set the scale to be the same as the other chat buttons
+		frame:SetScale(ChatFrameMenuButton:GetScale())
+	elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
 		-- arg1: the message to be printed to the chat frame.
 		-- Attempt to match the increased pattern string
 		local faction, change = arg1:match(L["REP_INC"])
@@ -118,6 +125,39 @@ function Consolid8.OnEvent(self, event, arg1, ...)
 		ChangeData("MONEY", coppers)
 		
 	end -- if event
+end
+
+--[[ Slash handler ]]--
+
+SLASH_CONSOLID1 = "/consolid8"
+SlashCmdList["CONSOLID"] = function(msg)
+	msg = string.lower(msg)
+	if msg == string.lower(L["REPORT"]) then
+		Consolid8.Report()
+	elseif msg == string.lower(RESET) then
+		Consolid8.Reset()
+	end
+end
+
+--[[ Broker plugin ]]--
+
+local dataObj = LibStub:GetLibrary("LibDataBroker-1.1"):NewDataObject("Consolid8",
+	{
+		type = "launcher",
+		icon = "Interface\\AddOns\\Consolid8\\Broker",
+		label = L["NAME"]
+	})
+
+function dataObj.OnClick(self --[[, button]])
+	Consolid8.ShowMenu(self)
+end
+
+function dataObj.OnEnter(self)
+	Consolid8.ShowTooltip()
+end
+
+function dataObj.OnLeave(self)
+	Consolid8.HideTooltip()
 end
 
 --[[ Tooltip ]]--
@@ -183,12 +223,16 @@ local menuList =
 	},
 }
 
-function Consolid8.ShowMenu()
+function Consolid8.ShowMenu(anchorTo)
+	-- Shows the menu documented in menuList.
+	-- anchorTo: If set, the menu will be anchored to this frame; else, it will be anchored to Consolid8_Frame.
 	-- Create the menu frame if need be
 	if not menuFrame then
 		menuFrame = CreateFrame("Frame", "Consolid8_Menu", Consolid8_Frame, "UIDropDownMenuTemplate")
-		menuFrame:SetPoint("BOTTOMLEFT", Consolid8_Frame, "BOTTOMRIGHT")
 	end
+	
+	-- Set the anchor
+	menuFrame:SetPoint("TOPRIGHT", (anchorTo or Consolid8_Frame), "TOPLEFT")
 	
 	EasyMenu(menuList, menuFrame, "Consolid8_Menu", 0, 0, "MENU")
 end
