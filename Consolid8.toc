@@ -1,0 +1,6 @@
+## Interface: 30200
+## Title: Consolid8
+## Notes: Gets rid of reputation change and money loot messages, and counts them up to make them meaningful.
+locale.lua
+Consolid8.lua
+Consolid8.xml
