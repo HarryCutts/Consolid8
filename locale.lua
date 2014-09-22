@@ -7,19 +7,19 @@ To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.
 
 local function CreateHybridPattern(str)
 	-- Returns: a pattern string used to process reputation gain messages.
-	local returnStr = str:replace("%s", "(.*)",  0, true)
-	returnStr = returnStr:replace("%d", "(%d*)", 0, true)
+	local returnStr = gsub(str, "%%s", "(.*)")
+	returnStr = gsub(returnStr, "%%d", "(%%d*)")
 	return returnStr
 end
 
 local function CreateIntegerPattern(str)
 	-- Returns: a pattern string used to process honor and money messages.
-	return str:replace("%d", "(%d*)", 0, true)
+	return gsub(str, "%%d", "(%%d*)")
 end
 
 local function CreateStringPattern(str)
 	-- Returns: a pattern string used to process loot messages.
-	return str:replace("%s", "(.*)", 0, true)
+	return gsub(str, "%%s", "(.*)")
 end
 
 local addOnName,L= ...
