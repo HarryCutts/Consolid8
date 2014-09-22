@@ -103,9 +103,9 @@ local function LootPrint(msg)
 	printing = true
 	local i
 
-	arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9 = msg, "", "", "", "", "", "", "", ""
-	for key, chatFrame in ipairs(chatFrames) do
-		ChatFrame_OnEvent(chatFrame, "CHAT_MSG_LOOT", msg, "", "", "", "", "", "", "", "")
+	arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11,arg12 = msg, "", "", "", "", "", "", "", "", "", "", ""
+	for key, chatFrame in pairs(chatFrames) do
+		ChatFrame_OnEvent(chatFrame, "CHAT_MSG_LOOT", msg, "", "", "", "", "", "", "", "", "", "", "")
 	end
 	printing = false
 end

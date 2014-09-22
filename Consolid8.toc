@@ -2,7 +2,7 @@
 ## Title: Consolid8
 ## Notes: Gets rid of reputation change and money loot messages, and counts them up to make them meaningful.
 ## SavedVariables: Consolid8_Settings
-## Version: 1.4
+## Version: 1.45a
 ## X-Category: Chat/Communication
 LibStub.lua
 CallbackHandler-1.0.lua

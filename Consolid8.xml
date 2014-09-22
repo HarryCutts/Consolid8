@@ -56,7 +56,7 @@
 	<Button name="Consolid8_Frame" parent="UIParent" enableMouse="true" movable="true">
 		<Size x="32" y="32" />
 		<Anchors>
-			<Anchor point="BOTTOM" relativeTo="ChatFrameMenuButton" relativePoint="TOP" />
+			<Anchor point="BOTTOM" relativeTo="FriendsMicroButton" relativePoint="TOP" />
 		</Anchors>
 		<Scripts>
 			<OnLoad> return Consolid8.OnLoad()	</OnLoad>
