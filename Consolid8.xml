@@ -81,7 +81,7 @@
 				end
 			</OnMouseWheel>
 			<OnMouseUp>
-				self:StopMovingOrSizing()
+				return self:StopMovingOrSizing()
 			</OnMouseUp>
 		</Scripts>
 		
@@ -94,7 +94,7 @@
 	<Frame name="Consolid8_Menu" inherits="UIDropDownMenuTemplate" frameStrata="DIALOG_FULLSCREEN">
 		<Scripts>
 			<OnLoad>
-				UIDropDownMenu_Initialize(self, Consolid8.MenuFunction, "MENU")
+				return UIDropDownMenu_Initialize(self, Consolid8.MenuFunction, "MENU")
 			</OnLoad>
 		</Scripts>
 	</Frame>

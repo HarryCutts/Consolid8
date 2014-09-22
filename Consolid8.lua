@@ -3,21 +3,16 @@
 
 	This work by Harry Cutts is licensed under a
 	Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-	To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/.
+	To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/ .
 ]]--
---[[Consolid8_Settings members
-	auto	: True if autoreporting is enabled; else false.
-	loot	: True if loot consolidation is enabled; else false.
-	scale	: Stores the scale of the button.
-	visible	: True if the button should be visible; else false.
-]]
 
-local addOnName, L = ...	-- Local locale table
+--[[ Local variables ]]--
+local addOnName, L = ...	-- Name and locale table
 
--- [[ Data ]]--
-local originalHonor
+local frame
+--local originalHonor
 local originalXP, originalXPMax,
-	gainedXP	-- XP gained before the last level up
+	gainedXP	-- [XP] XP gained before the last level up
 local data = {}
 local specialData = {
 	-- money	: money looted
@@ -26,13 +21,14 @@ local specialData = {
 Consolid8 = { data = data, specialData = specialData, }
 
 --[[ Utility Functions ]]--
+local print,CoppersToString,StringToCoppers,ChangeData,ChangeSpecialData,ConcatKeys,ConcatValues;do
 
-local function print(msg)
-	return DEFAULT_CHAT_FRAME:AddMessage("|cFF0080FF" .. addOnName .. ":|r " .. tostring(msg))
+function print(msg)
+	return DEFAULT_CHAT_FRAME:AddMessage(format("|cFF0080FF%s:|r%s", addOnName, tostring(msg)))
 end
 
-local function CoppersToString(copper)
-	-- Returns: a formatted money string
+function CoppersToString(copper)
+	-- Returns: a formatted money string.
 	local gold	 = math.floor(copper / 10000)
 	copper		 = copper % 10000
 	local silver = math.floor(copper / 100)
@@ -40,50 +36,48 @@ local function CoppersToString(copper)
 	return format(L["MONEY_FORMAT"], gold, silver, copper)
 end
 
-local function StringToCoppers(str)
+function StringToCoppers(str)
 	-- Returns: the amount of money in str, in coppers.
-	local gold	 = str:match(L["MONEY_GOLD"])	or 0
-	local silver = str:match(L["MONEY_SILVER"])	or 0
-	local copper = str:match(L["MONEY_COPPER"])	or 0
-	return (gold * 10000) + (silver * 100) + copper
+	return (str:match(L["GOLD"]) or 0) * 10000 + (str:match(L["SILVER"]) or 0) * 100 + (str:match(L["COPPER"]) or 0)
 end
 
-local function ChangeData(faction, change)
+function ChangeData(faction, change)
 	data[faction] = (data[faction] or 0) + change
 end
 
-local function ChangeSpecialData(key, change)
+function ChangeSpecialData(key, change)
 	specialData[key] = (specialData[key] or 0) + change
 end
 
 -- Thanks to Slakah of WoWInterface.com for these two functions
-local function ConcatKeys(tbl, key, ...)
+function ConcatKeys(tbl, key, ...)
 	local newKey, newValue = next(tbl, key)
-
 	if not newValue then return strjoin("\n", ...) end
-
 	return ConcatKeys(tbl, newKey, newKey, ...)
 end
 
-local function ConcatValues(tbl, key, ...)
+function ConcatValues(tbl, key, ...)
 	local newKey, newValue = next(tbl, key)
-
 	if not newValue then return strjoin("\n", ...) end
-
 	return ConcatValues(tbl, newKey, newValue, ...)
 end
 
---[[ Loot handling ]]--
+end
 
-local looting = false	-- True if the loot frame is open; else false.
+--[[ Looting ]]--
+
+local looting = false		-- true if player is looting; a number if player is auto-looting; else false.
 local lootString
-local printing = false	-- True if Consolid8 is sending a loot message; else false.
+local masterLooting = false	-- [Master Loot workaround] true if using Master Looter
+local timeout				-- [Timeout] the time remaining until loot is reported, in seconds.
 
-local chatFrames
+local printing = false		-- [Printing] true if LootPrint is running; else false.
+local chatFrames			-- [Printing] holds all chat frames registered for LOOT messages.
 
 local function UpdateChatFramesArray()
-	local i
+	-- [Printing] Adds all chat frames receiving LOOT messages to chatFrames
 	local function receives(...)
+		-- Returns: true if one of ... == "LOOT"; else false.
 		for i = 1, select('#', ...) do
 			if select(i, ...) == "LOOT" then
 				return true
@@ -100,50 +94,71 @@ local function UpdateChatFramesArray()
 end
 
 local function LootPrint(msg)
-	-- Sends CHAT_MSG_LOOT events to all chat frames which are registered for LOOT messages.
+	-- [ Printing Core ] Sends CHAT_MSG_LOOT events to all chat frames which are registered for LOOT messages.
 	printing = true
-	local i
-
-	arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11,arg12 = msg, "", "", "", "", "", "", "", "", "", "", ""
 	for key, chatFrame in pairs(chatFrames) do
 		ChatFrame_OnEvent(chatFrame, "CHAT_MSG_LOOT", msg, "", "", "", "", "", "", "", "", "", "", "")
 	end
 	printing = false
 end
 
-local function LogLoot(msg)
-	local link, quantity = msg:match("(.*)x(%d*)$")
-	if not link then
-		link = msg
-	end
-	
-	local _, _, rarity, _, _, _, _, _, _, _, sellPrice = GetItemInfo(link)
-	if rarity > ITEM_QUALITY_POOR then -- the item is not poor quality
-		lootString = ( lootString and (lootString .. ", " .. msg) ) or msg
-	else
-		ChangeSpecialData("greyValue", sellPrice * (quantity or 1))
-	end
-end
-
-local function StopLogging()
-	looting = false
+local function ReportLoot()
 	if lootString then
 		LootPrint(format(LOOT_ITEM_SELF, lootString))
 		lootString = nil
 	end
+	timeout = nil	-- [Timeout] Disable timer
 end
 
-local function LootFilter(chatFrame, event, arg1)	-- Discard args 2-11
-	if not printing and (arg1:match(L["LOOT"]) or arg1:match(L["LOOT_OTHER"])) then
-		return true
+local function NextItem()
+	-- To be called whenever the autolooter moves on to the next item; e.g. item looted, inventory full error, money looted etc.
+	-- Calls ReportLoot if the last item has been autolooted or LootFrame has closed.
+	timeout = 10	-- [Timeout] Enable/reset timer
+
+	if type(looting) == "number" then
+		-- See whether this was the last item
+		looting = looting - 1
+		if looting == 0 then
+			ReportLoot()
+		end
+
+	elseif not LootFrame:IsShown() then
+		-- See if the loot frame has been closed
+		ReportLoot()
 	end
+end
+
+local function LogLoot(link, quantity)
+	quantity = (quantity == "") and 1 or quantity
+	local _,_, rarity, _,_,_,_,_,_,_, sellPrice = GetItemInfo(link)
+	if masterLooting and rarity > GetLootThreshold() then
+		LootPrint(format(LOOT_ITEM_SELF, link))
+
+	elseif rarity > ITEM_QUALITY_POOR then -- the item is not poor quality
+		local msg = (quantity ~= 1) and format("%sx%s", link, quantity) or link
+		lootString = ( lootString and (lootString .. ", " .. msg) ) or msg
+	else
+		ChangeSpecialData("greyValue", sellPrice * quantity)
+	end
+end
+
+local function LootFilter(chatFrame, event, msg)	-- Discard args 2-11
+	-- Returns: true (discard) if player is (auto-)looting or msg matches LOOT_ITEM pattern; else false.
+	if printing then return false end
+
+	local returnValue = looting and msg:match(L["LOOT"]) or msg:match(L["LOOT_OTHER"])
+	-- Set looting to false if this message was trailing
+	if looting == 0 or (type(looting) == "boolean" and not LootFrame:IsShown()) then
+		looting = false
+	end
+	return returnValue
 end
 
 -- Settings functions
 local ToggleLoot; do
 
 function ToggleLoot()
-	Consolid8.SetLootSetting(not Consolid8_Settings.loot)
+	return Consolid8.SetLootSetting(not Consolid8_Settings.loot)
 end
 
 function Consolid8.SetLootSetting(loot)
@@ -157,6 +172,18 @@ end
 
 end
 
+--[[ Tradeskill handling (not yet ready) ]]--
+--[[local crafting
+
+local orig_DoTradeSkill = DoTradeSkill
+DoTradeSkill = function(item, quantity, ...)
+	if not crafting then
+		crafting = quantity
+		print("Crafting "..tostring(item).."x"..quantity)
+	end
+	orig_DoTradeSkill(item, quantity, ...)
+end
+]]--
 --[[ XP ]]--
 
 local function GetXP()
@@ -173,7 +200,7 @@ function Consolid8.Reset()
 	for key, value in pairs(specialData) do
 		specialData[key] = nil
 	end
-	originalHonor	= GetHonorCurrency()
+--	originalHonor	= GetHonorCurrency()
 	originalXP		= UnitXP("player")
 	print(RESET)
 end
@@ -181,12 +208,10 @@ end
 
 --[[ Event Handling ]]--
 
-local frame
 local inInstance = false	-- Instance tracking. Initialized on frame load.
-local original_ChatConfigFrameOkayButton_OnClick
+local orig_ConfigOkayButton_OnClick	-- Stores original funcion for ChatConfigFrameOkayButton:GetScript("OnClick")
 
-local eventHandlers
-eventHandlers = {
+local eventHandlers; eventHandlers = {
 	CHAT_MSG_COMBAT_FACTION_CHANGE = function(msg)	-- Reputation
 		-- Attempt to match the increased pattern string
 		local faction, change = msg:match(L["REP_INC"])
@@ -197,68 +222,54 @@ eventHandlers = {
 			-- Attempt to match the decreased pattern string
 			faction, change = msg:match(L["REP_DEC"])
 			
-			if change --[[a match has been found]] then ChangeData(faction, -change) end
-		end
-	end,
-
-	CHAT_MSG_MONEY = function(msg)					-- Money
-		ChangeSpecialData("money", StringToCoppers(msg))
-
-		if Consolid8_Settings.loot and type(looting) == "number" then -- Money loot is counted as an item for GetNumLootItems()
-			looting = looting - 1
-			if looting == 0 then
-				StopLogging()
-			end
+			if change then ChangeData(faction, -change) end
 		end
 	end,
 
 	--[[ Looting ]]--
-	LOOT_OPENED = function(autolooting)				-- Loot: start logging
+	CHAT_MSG_MONEY = function(msg)					-- Money
+		ChangeSpecialData("money", StringToCoppers(msg))
+		NextItem()
+	end,
+
+	LOOT_OPENED = function(autolooting)				-- Start logging
 		-- autolooting: 1 if autolooting, else 0 (NOT NIL!)
 		if not Consolid8_Settings.loot then return end
 
-		if autolooting == 1 then
-			looting = GetNumLootItems()
-		else
-			looting = true
+		looting = (autolooting == 1) and GetNumLootItems() or true
+	end,
+
+	CHAT_MSG_LOOT = function(msg)					-- Log message
+		if not (looting and Consolid8_Settings.loot) then return end
+
+		local link, quantity = msg:match(L["LOOT"])
+		if link then
+			LogLoot(link, quantity)
+			NextItem()
 		end
 	end,
 
-	CHAT_MSG_LOOT = function(msg)							-- log message
-		if not Consolid8_Settings.loot then return end
+	UI_ERROR_MESSAGE = function(msg)				-- Check for full inventory etc.
+		if msg == ERR_INV_FULL or msg == ERR_LOOT_CANT_LOOT_THAT or msg == ERR_LOOT_CANT_LOOT_THAT_NOW or msg == ERR_LOOT_ROLL_PENDING then
+			NextItem()
 
-		local str = msg:match(L["LOOT"])
-		if str then
-			LogLoot(str)
-
-			if type(looting) == "number" then	-- See whether this was the last item
-				looting = looting - 1
-				if looting == 0 then
-					StopLogging()
-				end
-
-			elseif not LootFrame:IsShown() then	-- See if the loot frame has been closed
-				StopLogging()
-			end
+	-- elseif msg == INTERRUPTED then	-- [Tradeskill] Not yet ready
+		-- if crafting then
+			-- crafting = nil
+		-- end
 		end
 	end,
 
-	UI_ERROR_MESSAGE = function(msg)						-- check for full inventory etc.
-		if type(looting) == "number" and (msg == ERR_INV_FULL or msg == ERR_LOOT_CANT_LOOT_THAT
-				or msg == ERR_LOOT_CANT_LOOT_THAT_NOW or msg == ERR_LOOT_ROLL_PENDING) then
-			looting = looting - 1
-			if looting == 0 then
-				StopLogging()
-			end
-		end
+	PARTY_LOOT_METHOD_CHANGED = function()			-- [Master Loot workaround] set masterLooting
+		masterLooting = (GetLootMethod() == "master")
 	end,
 
 	--[[ XP ]]--
 
 	PLAYER_LEVEL_UP = function()					-- Update XP logging
-		gainedXP	= gainedXP + originalXPMax - originalXP
-		originalXP 	= 0
-		originalXP 	= UnitXPMax("player")
+		gainedXP		= gainedXP + originalXPMax - originalXP
+		originalXP 		= 0
+		originalXPMax 	= UnitXPMax("player")
 	end,
 
 	--[[ ]]--
@@ -271,7 +282,7 @@ eventHandlers = {
 		if not Consolid8_Settings.visible then
 			frame:Hide()
 		end
-		Consolid8.SetLootSetting	(Consolid8_Settings.loot)
+		Consolid8.SetLootSetting(Consolid8_Settings.loot)
 
 		-- Self-destruct
 		frame:UnregisterEvent("ADDON_LOADED")
@@ -292,11 +303,11 @@ eventHandlers = {
 	end,
 
 	PLAYER_LOGIN = function()						-- Scale frame, initialize variables
-		-- Set the scale to be the same as the other chat buttons
+		-- Set the scale to be the same as the other chat buttons, or to the user's setting
 		frame:SetScale(Consolid8_Settings.scale or ChatFrameMenuButton:GetScale())
 
-		-- Record the starting honor and XP
-		originalHonor	= GetHonorCurrency()
+	--	originalHonor	= GetHonorCurrency()
+		-- [XP] Record the starting XP
 		originalXP		= UnitXP("player")
 		originalXPMax	= UnitXPMax("player")
 		gainedXP		= 0
@@ -315,10 +326,20 @@ function Consolid8.OnLoad()
 	inInstance = IsInInstance()
 
 	-- Hook ChatConfigFrameOkayButton's OnClick script
-	original_ChatConfigFrameOkayButton_OnClick = ChatConfigFrameOkayButton:GetScript("OnClick")
+	orig_ConfigOkayButton_OnClick = ChatConfigFrameOkayButton:GetScript("OnClick")
 	ChatConfigFrameOkayButton:SetScript("OnClick", function(...)
-		original_ChatConfigFrameOkayButton_OnClick(...)
+		orig_ConfigOkayButton_OnClick(...)
 		UpdateChatFramesArray()
+	end)
+
+	-- [Looting][Timeout] Register OnUpdate function (not in XML for speed and local access)
+	frame:SetScript("OnUpdate", function(self, elapsed)
+		if timeout then
+			timeout = timeout - elapsed
+			if timeout <= 0 then
+				ReportLoot()
+			end
+		end
 	end)
 
 	-- Register events
@@ -331,8 +352,7 @@ do --[[ UI ]]--
 
 -- Grey color
 local r, g, b = GetItemQualityColor(0)
-local greyText = format("|cff%02x%02x%02x", r * 255, g * 255, b * 255 ) .. "%s|r"
-r, g, b = nil, nil, nil
+local GREY_TEXT = format("|cff%02x%02x%02x", r * 255, g * 255, b * 255 ) .. "%s|r"
 
 -- Report dialog
 StaticPopupDialogs.Consolid8 = {
@@ -350,14 +370,14 @@ StaticPopupDialogs.Consolid8 = {
 		end
 		if specialData.greyValue then
 			namesStr  = namesStr .. "\n"
-			valuesStr = valuesStr .. "\n" .. format(greyText, CoppersToString(specialData.greyValue))
+			valuesStr = valuesStr .. "\n" .. format(GREY_TEXT, CoppersToString(specialData.greyValue))
 		end
 
-		local honorGain = GetHonorCurrency() - originalHonor
+	--[[local honorGain = GetHonorCurrency() - originalHonor
 		if honorGain ~= 0 then
 			namesStr  = namesStr  .. "\n" .. HONOR
 			valuesStr = valuesStr .. "\n" .. honorGain
-		end
+		end]]
 
 		local xpGain = GetXP()
 		if xpGain ~= 0 then
@@ -368,22 +388,22 @@ StaticPopupDialogs.Consolid8 = {
 		-- Custom popup frames
 		local namesFS, valuesFS, autoCB
 		if not self.namesFS then
-			namesFS		= self:CreateFontString(nil, "ARTWORK", "Consolid8NameStyle")
+			namesFS	 = self:CreateFontString(nil, "ARTWORK", "Consolid8NameStyle")
 			namesFS:SetPoint("LEFT", self, "LEFT", 15, 0)
 			self.namesFS = namesFS
 
-			valuesFS	= self:CreateFontString(nil, "ARTWORK", "Consolid8ValueStyle")
+			valuesFS = self:CreateFontString(nil, "ARTWORK", "Consolid8ValueStyle")
 			valuesFS:SetPoint("RIGHT", self, "RIGHT", -15, 0)
 			self.valuesFS = valuesFS
 
-			autoCB 		= CreateFrame("CheckButton", nil, self, "Consolid8_CBTemplate")
+			autoCB 	 = CreateFrame("CheckButton", nil, self, "Consolid8_CBTemplate")
 			autoCB:SetText(L["AUTO"])
 			autoCB:SetPoint("BOTTOMLEFT", self.button1, "TOPLEFT", 0, 0)
 			self.autoCB = autoCB
 		else
-			namesFS		= self.namesFS
-			valuesFS	= self.valuesFS
-			autoCB		= self.autoCB
+			namesFS	 = self.namesFS
+			valuesFS = self.valuesFS
+			autoCB	 = self.autoCB
 		end
 		
 		namesFS:SetText(namesStr)
@@ -429,7 +449,7 @@ function Consolid8.Report()
 end
 
 -- Slash handler
-SLASH_CONSOLID1 = "/consolid8"
+SLASH_CONSOLID1 = "/"..addOnName
 SlashCmdList["CONSOLID"] = function(msg)
 	msg = string.lower(msg)
 	if msg == string.lower(L["REPORT"]) then
@@ -486,21 +506,21 @@ function Consolid8.ShowTooltip()
 		tooltip:AddDoubleLine(MONEY, CoppersToString(specialData.money))
 	end
 	if specialData.greyValue then
-		tooltip:AddDoubleLine(" ", format(greyText, CoppersToString(specialData.greyValue)))
+		tooltip:AddDoubleLine(" ", format(GREY_TEXT, CoppersToString(specialData.greyValue)))
 	end
 
-	-- Honor & XP
-	local honorGain = GetHonorCurrency() - originalHonor
+	-- Honor, levels & XP
+--[[local honorGain = GetHonorCurrency() - originalHonor
 	if honorGain ~= 0 then
 		tooltip:AddDoubleLine(HONOR, honorGain)
-	end
+	end]]
 
 	local xpGain = GetXP()
 	if xpGain ~= 0 then
 		tooltip:AddDoubleLine(COMBAT_XP_GAIN, xpGain)
 	end
 
-	tooltip:Show()
+	return tooltip:Show()
 end
 
 function Consolid8.HideTooltip()

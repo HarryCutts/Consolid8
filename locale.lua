@@ -1,13 +1,11 @@
---[[
-Consolid8, a World of Warcraft chat frame addon
+--[[Consolid8, a World of Warcraft chat frame addon
 Copyright 2010 Harry Cutts
 
 This work by Harry Cutts is licensed under a
 Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/.
-]]--
+To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/.]]--
 
-local function CreateFactionPattern(str)
+local function CreateHybridPattern(str)
 	-- Returns: a pattern string used to process reputation gain messages.
 	local returnStr = str:replace("%s", "(.*)",  0, true)
 	returnStr = returnStr:replace("%d", "(%d*)", 0, true)
@@ -41,15 +39,17 @@ L["AUTO"]	= "Automatically report"
 
 -- Processed Blizzard Localisation
 -- Pattern strings
-L["REP_DEC"]  		= CreateFactionPattern(FACTION_STANDING_DECREASED)
-L["REP_INC"]		= CreateFactionPattern(FACTION_STANDING_INCREASED)
+local linkAndQuantity = "(|c.*|r)x?(%d*)"
+L["REP_DEC"]	= CreateHybridPattern (FACTION_STANDING_DECREASED)
+L["REP_INC"]	= CreateHybridPattern (FACTION_STANDING_INCREASED)
 
-L["MONEY_GOLD"]		= CreateIntegerPattern(GOLD_AMOUNT)
-L["MONEY_SILVER"]	= CreateIntegerPattern(SILVER_AMOUNT)
-L["MONEY_COPPER"]	= CreateIntegerPattern(COPPER_AMOUNT)
+L["GOLD"]		= CreateIntegerPattern(GOLD_AMOUNT)
+L["SILVER"]		= CreateIntegerPattern(SILVER_AMOUNT)
+L["COPPER"]		= CreateIntegerPattern(COPPER_AMOUNT)
 
-L["LOOT"]			= CreateStringPattern (LOOT_ITEM_SELF)
-L["LOOT_OTHER"]		= CreateStringPattern (LOOT_ITEM)
+--L["LOOT"]		= CreateStringPattern (LOOT_ITEM_SELF)
+L["LOOT"]		= format(LOOT_ITEM_SELF, linkAndQuantity)
+L["LOOT_OTHER"]	= CreateStringPattern (LOOT_ITEM)
 
 
 local loc = GetLocale()
