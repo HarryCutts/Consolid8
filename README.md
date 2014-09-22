@@ -5,13 +5,13 @@ Consolid8 is an add-on for [World of Warcraft](http://worldofwarcraft.com/).
 
 Completing a dungeon in World of Warcraft can require considerable teamwork, and is often coordinated through the in-game chat window. Unfortunately, said chat window is often busy with other things:
 
-> Reputation with Wyrmrest Accord increased by 13.
-> Reputation with Wyrmrest Accord increased by 13.
-> Your share of the loot is 5 Silver, 10 Copper.
-> Reputation with Wyrmrest Accord increased by 13.
-> Reputation with Wyrmrest Accord increased by 13.
-> You receive loot: [Thick Fur Clothing Scraps]
-> Your share of the loot is 1 Gold, 13 Silver, 52 Copper.
+> Reputation with Wyrmrest Accord increased by 13.  
+> Reputation with Wyrmrest Accord increased by 13.  
+> Your share of the loot is 5 Silver, 10 Copper.  
+> Reputation with Wyrmrest Accord increased by 13.  
+> Reputation with Wyrmrest Accord increased by 13.  
+> You receive loot: [Thick Fur Clothing Scraps]  
+> Your share of the loot is 1 Gold, 13 Silver, 52 Copper.  
 
 Your chat messages are mixed in with a slew of messages informing you of many relatively minor gains.
 
@@ -31,15 +31,15 @@ Consolid8 takes these messages and more, filters them, and only shows the import
 *	**Crafting**:
 	When you craft more than one item, Consolid8 counts how many you make and how many skill-ups they give you, and only displays two messages. For example:
 
-	> Your skill in Tailoring has increased to 76.
-	> You create: [Woolen Cape].
-	> Your skill in Tailoring has increased to 77.
-	> You create: [Woolen Cape].
+	> Your skill in Tailoring has increased to 76.  
+	> You create: [Woolen Cape].  
+	> Your skill in Tailoring has increased to 77.  
+	> You create: [Woolen Cape].  
 
 	Becomes:
 
-	> Your skill in Tailoring has increased to 77 (+2).
-	> You create: [Woolen Cape]x2.
+	> Your skill in Tailoring has increased to 77 (+2).  
+	> You create: [Woolen Cape]x2.  
 
 Installation
 ------------
