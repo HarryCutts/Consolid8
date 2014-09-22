@@ -296,6 +296,7 @@ eventHandlers = {
 		frame:SetScale(Consolid8_Settings.scale or ChatFrameMenuButton:GetScale())
 
 		-- Record the starting honor and XP
+		originalHonor	= GetHonorCurrency()
 		originalXP		= UnitXP("player")
 		originalXPMax	= UnitXPMax("player")
 		gainedXP		= 0
