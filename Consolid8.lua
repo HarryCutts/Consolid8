@@ -16,7 +16,8 @@ local addOnName, L = ...	-- Local locale table
 
 -- [[ Data ]]--
 local originalHonor
-local originalXP
+local originalXP, originalXPMax,
+	gainedXP	-- XP gained before the last level up
 local data = {}
 local specialData = {
 	-- money	: money looted
@@ -156,6 +157,12 @@ end
 
 end
 
+--[[ XP ]]--
+
+local function GetXP()
+	return UnitXP("player") - originalXP + gainedXP
+end
+
 do--[[ Public functions ]]--
 
 function Consolid8.Reset()
@@ -246,6 +253,14 @@ eventHandlers = {
 		end
 	end,
 
+	--[[ XP ]]--
+
+	PLAYER_LEVEL_UP = function()					-- Update XP logging
+		gainedXP	= gainedXP + originalXPMax - originalXP
+		originalXP 	= 0
+		originalXP 	= UnitXPMax("player")
+	end,
+
 	--[[ ]]--
 	ADDON_LOADED = function(name)					-- Load saved variables (self-destructs)
 		if name ~= addOnName then return end
@@ -281,8 +296,9 @@ eventHandlers = {
 		frame:SetScale(Consolid8_Settings.scale or ChatFrameMenuButton:GetScale())
 
 		-- Record the starting honor and XP
-		originalHonor 	= GetHonorCurrency()
 		originalXP		= UnitXP("player")
+		originalXPMax	= UnitXPMax("player")
+		gainedXP		= 0
 	end,
 }
 
@@ -342,7 +358,7 @@ StaticPopupDialogs.Consolid8 = {
 			valuesStr = valuesStr .. "\n" .. honorGain
 		end
 
-		local xpGain	= UnitXP("player") - originalXP
+		local xpGain = GetXP()
 		if xpGain ~= 0 then
 			namesStr  = namesStr  .. "\n" .. COMBAT_XP_GAIN
 			valuesStr = valuesStr .. "\n" .. xpGain
@@ -477,7 +493,8 @@ function Consolid8.ShowTooltip()
 	if honorGain ~= 0 then
 		tooltip:AddDoubleLine(HONOR, honorGain)
 	end
-	local xpGain	= UnitXP("player") - originalXP
+
+	local xpGain = GetXP()
 	if xpGain ~= 0 then
 		tooltip:AddDoubleLine(COMBAT_XP_GAIN, xpGain)
 	end
