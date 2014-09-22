@@ -1,5 +1,5 @@
 #	Consolid8, a World of Warcraft chat frame addon
-#	Copyright 2010 Harry Cutts
+#	Copyright 2011 Harry Cutts
 #
 #	This work by Harry Cutts is licensed under a
 #	Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
@@ -7,15 +7,17 @@
 
 ## Interface: 40000
 ## Title: Consolid8
-## Notes: Gets rid of reputation change and money loot messages, and counts them up to make them meaningful.
+## Notes: Gets rid of reputation change and money loot messages, and counts them up to make them meaningful. Slash command: /consolid8
 ## SavedVariables: Consolid8_Settings
 # Settings table members:
+#	version	: the version that is currently being used. Used to detect when upgrades occur.
 #	auto	: true if autoreporting is enabled; else false.
 #	loot	: true if loot consolidation is enabled; else false.
+#	skill	: true if tradeskill consolidation is enabled; else false.
 #	scale	: Stores the scale of the button.
 #	visible	: true if the button should be visible; else false.
 
-## Version: 1.5
+## Version: 1.6
 ## X-Category: Chat/Communication
 # Libraries
 LibStub.lua

@@ -1,9 +1,9 @@
 --[[Consolid8, a World of Warcraft chat frame addon
-Copyright 2010 Harry Cutts
+Copyright 2011 Harry Cutts
 
 This work by Harry Cutts is licensed under a
 Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/.]]--
+To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/ .]]--
 
 local function CreateHybridPattern(str)
 	-- Returns: a pattern string used to process reputation gain messages.
@@ -22,7 +22,7 @@ local function CreateStringPattern(str)
 	return str:replace("%s", "(.*)", 0, true)
 end
 
-local addOnName, L = ...
+local addOnName,L= ...
 
 -- Money format string with coin textures, size 16.
 L["MONEY_FORMAT"] = "%d\124TInterface\\MoneyFrame\\UI-GoldIcon:16:16:2:0\124t %d\124TInterface\\MoneyFrame\\UI-SilverIcon:16:16:2:0\124t %d\124TInterface\\MoneyFrame\\UI-CopperIcon:16:16:2:0\124t"
@@ -47,7 +47,9 @@ L["GOLD"]		= CreateIntegerPattern(GOLD_AMOUNT)
 L["SILVER"]		= CreateIntegerPattern(SILVER_AMOUNT)
 L["COPPER"]		= CreateIntegerPattern(COPPER_AMOUNT)
 
---L["LOOT"]		= CreateStringPattern (LOOT_ITEM_SELF)
+L["CREATE"]		= format(LOOT_ITEM_CREATED_SELF, linkAndQuantity)
+L["SKILL_UP"]	= CreateHybridPattern (SKILL_RANK_UP)
+
 L["LOOT"]		= format(LOOT_ITEM_SELF, linkAndQuantity)
 L["LOOT_OTHER"]	= CreateStringPattern (LOOT_ITEM)
 

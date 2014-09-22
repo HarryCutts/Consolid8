@@ -1,5 +1,5 @@
 --[[Consolid8, a World of Warcraft chat frame addon
-	Copyright 2010 Harry Cutts
+	Copyright 2011 Harry Cutts
 
 	This work by Harry Cutts is licensed under a
 	Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
@@ -10,7 +10,7 @@
 local addOnName, L = ...	-- Name and locale table
 
 local frame
---local originalHonor
+local originalHonor
 local originalXP, originalXPMax,
 	gainedXP	-- [XP] XP gained before the last level up
 local data = {}
@@ -20,11 +20,13 @@ local specialData = {
 }
 Consolid8 = { data = data, specialData = specialData, }
 
+local GetHonorCurrency = function() return select(2,GetCurrencyInfo(392)) or 0 end
+
 --[[ Utility Functions ]]--
 local print,CoppersToString,StringToCoppers,ChangeData,ChangeSpecialData,ConcatKeys,ConcatValues;do
 
 function print(msg)
-	return DEFAULT_CHAT_FRAME:AddMessage(format("|cFF0080FF%s:|r%s", addOnName, tostring(msg)))
+	return DEFAULT_CHAT_FRAME:AddMessage(format("|cFF0080FF%s:|r %s", addOnName, tostring(msg)))
 end
 
 function CoppersToString(copper)
@@ -64,6 +66,111 @@ end
 
 end
 
+--[[ Chat Message Printing ]]--
+
+-- These are arrays of chat frames which receive certain message types. Each also has a msgType value equal to the
+-- message type that they receive. For example, lootCFs is populated with chat frames receiving LOOT messages, and
+-- lootCFs.msg = "LOOT".
+local lootCFs, skillCFs
+
+local printing = false	-- true if ChatPrint is running; else false. Consolid8's filters return false when printing is true.
+local lastLootCF		-- the last chat frame that receives LOOT messages.
+
+local function UpdateCFArrays()
+	-- [Printing] Adds all chat frames receiving LOOT messages to lootCFs and all receiving SKILL to skillCFs
+
+	local function receives(msgType, ...)
+		-- Returns: true if one of ... == "LOOT"; else false.
+		for i = 1, select('#', ...) do
+			if select(i, ...) == msgType then
+				return true
+			end
+		end
+		return false
+	end
+
+	lootCFs		= { msgType = "LOOT" }
+	skillCFs	= { msgType = "SKILL" }
+	for i = 1, NUM_CHAT_WINDOWS do
+		if receives("LOOT", GetChatWindowMessages(i)) then
+			lastLootCF = _G["ChatFrame"..i]
+			tinsert(lootCFs, lastLootCF)
+		end
+		if receives("SKILL", GetChatWindowMessages(i)) then
+			tinsert(skillCFs, _G["ChatFrame"..i])
+		end
+	end
+end
+
+local function ChatPrint(CFs, msg)
+	-- [ Printing Core ] Sends CHAT_MSG_(CFs.msgType) events to all chat frames in CFs.
+	printing = true
+	local msgType = "CHAT_MSG_" .. CFs.msgType
+	for i = 1, #CFs do
+		ChatFrame_OnEvent(CFs[i], msgType, msg, "", "", "", "", "", "", "", "", "", "", "")
+	end
+	printing = false
+end
+
+--[[ Tradeskill handling ]]--
+-- Note: loot message filtering for tradeskills is handled by LootFilter() in the Looting section
+
+local craftingLink	-- Link to the item being crafted
+local lastSkillMsg	-- The last skill message that was filtered by SkillFilter
+
+local crafting		-- If player is crafting, the number of actions remaining; else nil.
+local totalCrafted	-- The total number of items crafted
+
+-- DoTradeSkill hook to detect start of crafting
+local orig_DoTradeSkill = DoTradeSkill
+DoTradeSkill = function(index, quantity, ...)
+	local skillName, skillType, numAvailable, isExpanded, altVerb, numSkillUps = GetTradeSkillInfo(index)
+	if not crafting and Consolid8_Settings.skill and (altVerb == nil) then
+		-- altVerb == nil: ensures that this is a "Create" skill (e.g. not "Enchant")
+		craftingLink = GetTradeSkillItemLink(index)
+		crafting = quantity
+		totalCrafted = 0
+	end
+	orig_DoTradeSkill(index, quantity, ...)
+end
+
+local function ReportCrafting()
+	-- Prints the final skill gain and loot messages to their proper chat frames.
+	if totalCrafted and totalCrafted <= 0 then return end
+	if lastSkillMsg then ChatPrint(skillCFs, lastSkillMsg) end
+	ChatPrint(lootCFs, format(LOOT_ITEM_CREATED_SELF, format("%sx%s", craftingLink, totalCrafted)))
+	craftingLink = nil
+	lastSkillMsg = nil
+	totalCrafted = nil
+end
+
+-- TODO: Stop this happening for enchanting
+local function SkillFilter(chatFrame, event, msg)
+	-- Returns: true (discard) if crafting and the message is a skill increase.
+	if crafting and not printing and msg:match(L["SKILL_UP"]) then
+		lastSkillMsg = msg
+		return true
+	end
+end
+
+-- Settings functions
+local ToggleSkill; do
+
+function ToggleSkill()
+	return Consolid8.SetSkillSetting(not Consolid8_Settings.skill)
+end
+
+function Consolid8.SetSkillSetting(skill)
+	Consolid8_Settings.skill = skill
+	if skill then
+		ChatFrame_AddMessageEventFilter("CHAT_MSG_SKILL", SkillFilter)
+	else
+		ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SKILL", SkillFilter)
+	end
+end
+
+end
+
 --[[ Looting ]]--
 
 local looting = false		-- true if player is looting; a number if player is auto-looting; else false.
@@ -71,40 +178,9 @@ local lootString
 local masterLooting = false	-- [Master Loot workaround] true if using Master Looter
 local timeout				-- [Timeout] the time remaining until loot is reported, in seconds.
 
-local printing = false		-- [Printing] true if LootPrint is running; else false.
-local chatFrames			-- [Printing] holds all chat frames registered for LOOT messages.
-
-local function UpdateChatFramesArray()
-	-- [Printing] Adds all chat frames receiving LOOT messages to chatFrames
-	local function receives(...)
-		-- Returns: true if one of ... == "LOOT"; else false.
-		for i = 1, select('#', ...) do
-			if select(i, ...) == "LOOT" then
-				return true
-			end
-		end
-		return false
-	end
-	chatFrames = {}
-	for i = 1, NUM_CHAT_WINDOWS do
-		if receives(GetChatWindowMessages(i)) then
-			tinsert(chatFrames, getglobal("ChatFrame"..i))
-		end
-	end
-end
-
-local function LootPrint(msg)
-	-- [ Printing Core ] Sends CHAT_MSG_LOOT events to all chat frames which are registered for LOOT messages.
-	printing = true
-	for key, chatFrame in pairs(chatFrames) do
-		ChatFrame_OnEvent(chatFrame, "CHAT_MSG_LOOT", msg, "", "", "", "", "", "", "", "", "", "", "")
-	end
-	printing = false
-end
-
 local function ReportLoot()
 	if lootString then
-		LootPrint(format(LOOT_ITEM_SELF, lootString))
+		ChatPrint(lootCFs, format(LOOT_ITEM_SELF, lootString))
 		lootString = nil
 	end
 	timeout = nil	-- [Timeout] Disable timer
@@ -132,7 +208,7 @@ local function LogLoot(link, quantity)
 	quantity = (quantity == "") and 1 or quantity
 	local _,_, rarity, _,_,_,_,_,_,_, sellPrice = GetItemInfo(link)
 	if masterLooting and rarity > GetLootThreshold() then
-		LootPrint(format(LOOT_ITEM_SELF, link))
+		ChatPrint(lootCFs, format(LOOT_ITEM_SELF, link))
 
 	elseif rarity > ITEM_QUALITY_POOR then -- the item is not poor quality
 		local msg = (quantity ~= 1) and format("%sx%s", link, quantity) or link
@@ -142,15 +218,25 @@ local function LogLoot(link, quantity)
 	end
 end
 
-local function LootFilter(chatFrame, event, msg)	-- Discard args 2-11
-	-- Returns: true (discard) if player is (auto-)looting or msg matches LOOT_ITEM pattern; else false.
+local function LootFilter(chatFrame, event, msg)	-- +[Tradeskill] Discard args 2-11
+	-- Returns: true (discard) if (auto-)looting or crafting and msg matches pattern; else false.
 	if printing then return false end
 
-	local returnValue = looting and msg:match(L["LOOT"]) or msg:match(L["LOOT_OTHER"])
-	-- Set looting to false if this message was trailing
-	if looting == 0 or (type(looting) == "boolean" and not LootFrame:IsShown()) then
-		looting = false
+	local returnValue =
+		looting and msg:match(L["LOOT"]) or msg:match(L["LOOT_OTHER"])
+		or crafting and msg:match(L["CREATE"])
+
+	-- Set looting/crafting to false if this message was trailing (and if this is the last CF to receive LOOT messages)
+	-- A trailing message is one that comes after the loot frame has closed
+	if chatFrame == lastLootCF then
+		if looting == 0 or (type(looting) == "boolean" and not LootFrame:IsShown()) then
+			looting = false
+		end
+		if crafting == 0 then
+			crafting = false
+		end
 	end
+
 	return returnValue
 end
 
@@ -172,25 +258,13 @@ end
 
 end
 
---[[ Tradeskill handling (not yet ready) ]]--
---[[local crafting
-
-local orig_DoTradeSkill = DoTradeSkill
-DoTradeSkill = function(item, quantity, ...)
-	if not crafting then
-		crafting = quantity
-		print("Crafting "..tostring(item).."x"..quantity)
-	end
-	orig_DoTradeSkill(item, quantity, ...)
-end
-]]--
 --[[ XP ]]--
 
 local function GetXP()
 	return UnitXP("player") - originalXP + gainedXP
 end
 
-do--[[ Public functions ]]--
+--[[ Public functions ]]--
 
 function Consolid8.Reset()
 	-- Clears all stored data.
@@ -200,15 +274,14 @@ function Consolid8.Reset()
 	for key, value in pairs(specialData) do
 		specialData[key] = nil
 	end
---	originalHonor	= GetHonorCurrency()
+	originalHonor	= GetHonorCurrency()
 	originalXP		= UnitXP("player")
 	print(RESET)
-end
 end
 
 --[[ Event Handling ]]--
 
-local inInstance = false	-- Instance tracking. Initialized on frame load.
+local inInstance = false			-- Instance tracking. Initialized on frame load.
 local orig_ConfigOkayButton_OnClick	-- Stores original funcion for ChatConfigFrameOkayButton:GetScript("OnClick")
 
 local eventHandlers; eventHandlers = {
@@ -239,29 +312,43 @@ local eventHandlers; eventHandlers = {
 		looting = (autolooting == 1) and GetNumLootItems() or true
 	end,
 
-	CHAT_MSG_LOOT = function(msg)					-- Log message
-		if not (looting and Consolid8_Settings.loot) then return end
+	CHAT_MSG_LOOT = function(msg)					-- +[Tradeskill] Log message
+		if crafting then
+			local link, quantity = msg:match(L["CREATE"])
+			crafting = crafting - 1
+			totalCrafted = (totalCrafted or 0) + ((quantity == "") and 1 or quantity or 1)
+			if crafting == 0 then
+				ReportCrafting()
+			end
 
-		local link, quantity = msg:match(L["LOOT"])
-		if link then
-			LogLoot(link, quantity)
-			NextItem()
+		elseif looting and Consolid8_Settings.loot then
+			local link, quantity = msg:match(L["LOOT"])
+			if link then
+				LogLoot(link, quantity)
+				NextItem()
+			end
 		end
 	end,
 
-	UI_ERROR_MESSAGE = function(msg)				-- Check for full inventory etc.
-		if msg == ERR_INV_FULL or msg == ERR_LOOT_CANT_LOOT_THAT or msg == ERR_LOOT_CANT_LOOT_THAT_NOW or msg == ERR_LOOT_ROLL_PENDING then
+	UI_ERROR_MESSAGE = function(msg)				-- +[Tradeskill] Check for full inventory etc.
+		if crafting and (msg == INTERRUPTED or msg == ERR_INV_FULL) then
+			-- [Tradeskill] Register that crafting has been interrupted
+			ReportCrafting()
+		elseif msg == ERR_INV_FULL or msg == ERR_LOOT_CANT_LOOT_THAT or msg == ERR_LOOT_CANT_LOOT_THAT_NOW or msg == ERR_LOOT_ROLL_PENDING then
 			NextItem()
-
-	-- elseif msg == INTERRUPTED then	-- [Tradeskill] Not yet ready
-		-- if crafting then
-			-- crafting = nil
-		-- end
 		end
 	end,
 
 	PARTY_LOOT_METHOD_CHANGED = function()			-- [Master Loot workaround] set masterLooting
 		masterLooting = (GetLootMethod() == "master")
+	end,
+
+	--[[ Tradeskill ]]--
+
+	TRADE_SKILL_CLOSE = function()					-- Note that the crafting process will stop after the next action
+		if crafting then
+			crafting = 1
+		end
 	end,
 
 	--[[ XP ]]--
@@ -272,24 +359,32 @@ local eventHandlers; eventHandlers = {
 		originalXPMax 	= UnitXPMax("player")
 	end,
 
-	--[[ ]]--
+	--[[ Other ]]--
 	ADDON_LOADED = function(name)					-- Load saved variables (self-destructs)
 		if name ~= addOnName then return end
 
 		if not Consolid8_Settings then
-			Consolid8_Settings = { loot = true, visible = true, auto = true }
+			Consolid8_Settings = { loot = true, skill = true, visible = true, auto = true }
 		end
+		-- Check for upgrade
+		local versionMeta = GetAddOnMetadata(addOnName, "Version")
+		if Consolid8_Settings.version ~= versionMeta then
+			Consolid8_Settings.version = versionMeta
+			Consolid8_Settings.skill = true
+		end
+
 		if not Consolid8_Settings.visible then
 			frame:Hide()
 		end
 		Consolid8.SetLootSetting(Consolid8_Settings.loot)
+		Consolid8.SetSkillSetting(Consolid8_Settings.skill)
 
 		-- Self-destruct
 		frame:UnregisterEvent("ADDON_LOADED")
 		eventHandlers.ADDON_LOADED = nil
 	end,
 
-	UPDATE_CHAT_WINDOWS = UpdateChatFramesArray,	-- Update chatFrames array
+	UPDATE_CHAT_WINDOWS = UpdateCFArrays,			-- Update lootCFs array
 
 	PLAYER_ENTERING_WORLD = function()				-- Check for leaving an instance
 		if IsInInstance() then
@@ -306,7 +401,7 @@ local eventHandlers; eventHandlers = {
 		-- Set the scale to be the same as the other chat buttons, or to the user's setting
 		frame:SetScale(Consolid8_Settings.scale or ChatFrameMenuButton:GetScale())
 
-	--	originalHonor	= GetHonorCurrency()
+		originalHonor	= GetHonorCurrency()
 		-- [XP] Record the starting XP
 		originalXP		= UnitXP("player")
 		originalXPMax	= UnitXPMax("player")
@@ -329,7 +424,7 @@ function Consolid8.OnLoad()
 	orig_ConfigOkayButton_OnClick = ChatConfigFrameOkayButton:GetScript("OnClick")
 	ChatConfigFrameOkayButton:SetScript("OnClick", function(...)
 		orig_ConfigOkayButton_OnClick(...)
-		UpdateChatFramesArray()
+		UpdateCFArrays()
 	end)
 
 	-- [Looting][Timeout] Register OnUpdate function (not in XML for speed and local access)
@@ -373,11 +468,11 @@ StaticPopupDialogs.Consolid8 = {
 			valuesStr = valuesStr .. "\n" .. format(GREY_TEXT, CoppersToString(specialData.greyValue))
 		end
 
-	--[[local honorGain = GetHonorCurrency() - originalHonor
+		local honorGain = GetHonorCurrency() - originalHonor
 		if honorGain ~= 0 then
 			namesStr  = namesStr  .. "\n" .. HONOR
 			valuesStr = valuesStr .. "\n" .. honorGain
-		end]]
+		end
 
 		local xpGain = GetXP()
 		if xpGain ~= 0 then
@@ -416,11 +511,11 @@ StaticPopupDialogs.Consolid8 = {
 		autoCB:SetChecked(Consolid8_Settings.auto)
 		autoCB:Show()
 
-		self.height = self:GetHeight() + namesFS:GetStringHeight()
+		self.height = self:GetHeight() + namesFS:GetStringHeight() + autoCB:GetHeight() + 10	-- Calculate the height
 	end,
 
 	OnUpdate = function(self)
-		return self:SetHeight(self.height)
+		return self:SetHeight(self.height)	-- Set the previously calculated height
 	end,
 
 	OnAccept = Consolid8.Reset,
@@ -510,10 +605,10 @@ function Consolid8.ShowTooltip()
 	end
 
 	-- Honor, levels & XP
---[[local honorGain = GetHonorCurrency() - originalHonor
+	local honorGain = GetHonorCurrency() - originalHonor
 	if honorGain ~= 0 then
 		tooltip:AddDoubleLine(HONOR, honorGain)
-	end]]
+	end
 
 	local xpGain = GetXP()
 	if xpGain ~= 0 then
@@ -548,6 +643,13 @@ local menuList =
 			if Consolid8_Settings then tbl.checked = Consolid8_Settings.loot end
 		end,
 		func	= ToggleLoot,
+	},
+	{	--[ ] Loot
+		text	= TRADESKILLS,
+		update	= function(tbl)
+			if Consolid8_Settings then tbl.checked = Consolid8_Settings.skill end
+		end,
+		func	= ToggleSkill,
 	},
 }
 
