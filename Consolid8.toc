@@ -5,7 +5,7 @@
 #	Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 #	To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/ .
 
-## Interface: 50400
+## Interface: 60000
 ## Title: Consolid8
 ## Notes: Gets rid of reputation change and money loot messages, and counts them up to make them meaningful. Slash command: /consolid8
 ## SavedVariables: Consolid8_Settings
