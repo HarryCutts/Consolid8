@@ -220,7 +220,7 @@ local function LogLoot(link, quantity)
 	elseif countItems[name] then
 		items[name] = (items[name] or 0) + quantity
 
-	elseif rarity > ITEM_QUALITY_POOR then -- the item is not poor quality
+	elseif rarity > 0 then -- the item is not poor quality
 		local msg = (quantity ~= 1) and format("%sx%s", link, quantity) or link
 		lootString = ( lootString and (lootString .. ", " .. msg) ) or msg
 	else
