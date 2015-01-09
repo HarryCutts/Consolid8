@@ -18,7 +18,7 @@
 #	visible		: true if the button should be visible; else false.
 #	countItems	: Table listing the items to be counted.
 
-## Version: 2.0b
+## Version: 2.0c
 ## X-Category: Chat/Communication
 # Libraries
 LibStub.lua
