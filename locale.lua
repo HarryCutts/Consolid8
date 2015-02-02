@@ -5,21 +5,45 @@ This work by Harry Cutts is licensed under a
 Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 To read this license, please see http://creativecommons.org/licenses/by-nc-sa/3.0/ .]]--
 
+local STR_PLACEHOLDER_RGX = "%%%d*%$?s"
+local INT_PLACEHOLDER_RGX = "%%%d*%$?d"
+
 local function CreateHybridPattern(str)
 	-- Returns: a pattern string used to process reputation gain messages.
-	local returnStr = gsub(str, "%%s", "(.*)")
-	returnStr = gsub(returnStr, "%%d", "(%%d*)")
+	local returnStr = str:gsub(STR_PLACEHOLDER_RGX, "(.*)")
+	returnStr = returnStr:gsub(INT_PLACEHOLDER_RGX, "(%%d*)")
 	return returnStr
 end
 
 local function CreateIntegerPattern(str)
 	-- Returns: a pattern string used to process honor and money messages.
-	return gsub(str, "%%d", "(%%d*)")
+	return str:gsub(INT_PLACEHOLDER_RGX, "(%%d*)")
 end
 
 local function CreateStringPattern(str)
 	-- Returns: a pattern string used to process loot messages.
-	return gsub(str, "%%s", "(.*)")
+	return str:gsub(STR_PLACEHOLDER_RGX, "(.*)")
+end
+
+local function CreateStrNumPatternMatcher(str)
+	-- Returns: a function which, when passed a string created with the given
+	--          format string, will always return the value of the string
+	--          parameter first, followed by the number. (Dem haxs.)
+	local strStart, _ = str:find(STR_PLACEHOLDER_RGX)
+	local intStart, _ = str:find(INT_PLACEHOLDER_RGX)
+	local pattern = CreateHybridPattern(str)
+	if strStart < intStart then
+		-- Order is as expected, so the matcher should just call string.match
+		return function(msg)
+			return msg:match(pattern)
+		end
+	else
+		-- The integer comes before the string, so we need to swap return values
+		return function(msg)
+			int, str = msg:match(pattern)
+			return str, int
+		end
+	end
 end
 
 local addOnName,L= ...
@@ -41,19 +65,22 @@ L["SHOW"]	= "Show"
 -- Processed Blizzard Localisation
 -- Pattern strings
 local linkAndQuantity = "(|c.*|r)x?(%d*)"
-L["REP_DEC"]	= CreateHybridPattern (FACTION_STANDING_DECREASED)
-L["REP_INC"]	= CreateHybridPattern (FACTION_STANDING_INCREASED)
-
 L["GOLD"]		= CreateIntegerPattern(GOLD_AMOUNT)
 L["SILVER"]		= CreateIntegerPattern(SILVER_AMOUNT)
 L["COPPER"]		= CreateIntegerPattern(COPPER_AMOUNT)
 
 L["CREATE"]		= format(LOOT_ITEM_CREATED_SELF, linkAndQuantity)
-L["SKILL_UP"]	= CreateHybridPattern (SKILL_RANK_UP)
 
 L["LOOT"]		= format(LOOT_ITEM_SELF, linkAndQuantity)
 L["LOOT_OTHER"]	= CreateStringPattern (LOOT_ITEM)
 
+-- Matcher functions
+L.MatchFactionDecrease = CreateStrNumPatternMatcher(FACTION_STANDING_DECREASED)
+L.MatchFactionIncrease = CreateStrNumPatternMatcher(FACTION_STANDING_INCREASED)
+
+L.MatchSkillRankUp = CreateStrNumPatternMatcher(SKILL_RANK_UP)
+
+-- "Normal" localised strings
 local loc = GetLocale()
 
 if loc == "frFR" then

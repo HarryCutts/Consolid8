@@ -155,7 +155,7 @@ end
 
 local function SkillFilter(chatFrame, event, msg)
 	-- Returns: true (discard) if crafting and the message is a skill increase.
-	if crafting and not printing and msg:match(L["SKILL_UP"]) then
+	if crafting and not printing and L.MatchSkillRankUp(msg) then
 		lastSkillMsg = msg
 		numSkillUps = (numSkillUps or 0) + 1
 		return true
@@ -294,13 +294,13 @@ local orig_ConfigOkayButton_OnClick	-- Stores original funcion for ChatConfigFra
 local eventHandlers; eventHandlers = {
 	CHAT_MSG_COMBAT_FACTION_CHANGE = function(msg)	-- Reputation
 		-- Attempt to match the increased pattern string
-		local faction, change = msg:match(L["REP_INC"])
+		local faction, change = L.MatchFactionIncrease(msg)
 
 		if change then
 			ChangeData(faction, change)
 		else
 			-- Attempt to match the decreased pattern string
-			faction, change = msg:match(L["REP_DEC"])
+			faction, change = L.MatchFactionDecrease(msg)
 			
 			if change then ChangeData(faction, -change) end
 		end
